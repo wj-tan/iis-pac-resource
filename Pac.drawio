@@ -1,0 +1,61 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/28.2.5 Chrome/138.0.7204.251 Electron/37.6.1 Safari/537.36" version="28.2.5">
+  <diagram name="Page-1" id="TP_Cynwup3MvIJqHy0ty">
+    <mxGraphModel dx="1810" dy="580" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-1" value="server01 (VM)&lt;div&gt;192.168.14.11&lt;/div&gt;&lt;div&gt;server01.lab.local&lt;/div&gt;" style="image;aspect=fixed;perimeter=ellipsePerimeter;html=1;align=center;shadow=0;dashed=0;spacingTop=3;image=img/lib/active_directory/windows_server_2.svg;" vertex="1" parent="1">
+          <mxGeometry y="270" width="40" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-2" value="server02 (VM)&lt;div&gt;192.168.14.12&lt;/div&gt;" style="image;aspect=fixed;perimeter=ellipsePerimeter;html=1;align=center;shadow=0;dashed=0;spacingTop=3;image=img/lib/active_directory/windows_server_2.svg;" vertex="1" parent="1">
+          <mxGeometry x="220" y="270" width="40" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-3" value="squid (VM)&lt;div&gt;192.168.14.10&lt;/div&gt;" style="image;sketch=0;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/mscae/VM_Linux.svg;" vertex="1" parent="1">
+          <mxGeometry x="260" y="40" width="50" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-4" value="Workstation&lt;div&gt;192.168.14.1&lt;/div&gt;" style="image;points=[];aspect=fixed;html=1;align=center;shadow=0;dashed=0;image=img/lib/allied_telesis/computer_and_terminals/Personal_Computer.svg;" vertex="1" parent="1">
+          <mxGeometry x="-2.799999999999997" y="32.1" width="45.6" height="61.800000000000004" as="geometry" />
+        </mxCell>
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-5" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.99;exitY=0.662;exitDx=0;exitDy=0;exitPerimeter=0;entryX=-0.051;entryY=0.73;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="fDWTSm_-TIUd4UwVjYYN-4" target="fDWTSm_-TIUd4UwVjYYN-3">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="180" y="190" as="sourcePoint" />
+            <mxPoint x="230" y="140" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-6" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;strokeColor=default;" edge="1" parent="1" source="fDWTSm_-TIUd4UwVjYYN-1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="130" y="210" as="sourcePoint" />
+            <mxPoint x="20" y="130" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-7" value="http://192.168.14.11/proxy.pac" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="180" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-9" value="" style="endArrow=classic;html=1;rounded=0;entryX=0;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" target="fDWTSm_-TIUd4UwVjYYN-1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint y="130" as="sourcePoint" />
+            <mxPoint x="180" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-11" value="Sync Pac File" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="290" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-12" value="Internet" style="image;aspect=fixed;perimeter=ellipsePerimeter;html=1;align=center;shadow=0;dashed=0;spacingTop=3;image=img/lib/active_directory/internet_globe.svg;" vertex="1" parent="1">
+          <mxGeometry x="490" y="38" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-13" value="" style="endArrow=classic;html=1;rounded=0;exitX=1.011;exitY=0.494;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="fDWTSm_-TIUd4UwVjYYN-3" target="fDWTSm_-TIUd4UwVjYYN-12">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="290" y="190" as="sourcePoint" />
+            <mxPoint x="340" y="140" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="fDWTSm_-TIUd4UwVjYYN-14" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="fDWTSm_-TIUd4UwVjYYN-1" target="fDWTSm_-TIUd4UwVjYYN-2">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="310" y="270" as="sourcePoint" />
+            <mxPoint x="360" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
