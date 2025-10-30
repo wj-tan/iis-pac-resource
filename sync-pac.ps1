@@ -1,14 +1,13 @@
 # ====================== CONFIGURATION ===========================
-$PACFiles          = @("proxy_sg.pac", "proxy_my.pac", "proxy_vn.pac") # List of PAC files
+$PACFiles          = @("proxy_sg.pac", "proxy_my.pac", "proxy_vn.pac")
 $SourceFolder      = "C:\inetpub\wwwroot"
 $ArchiveFolder     = "C:\PAC_Archive"
 $SecondaryServers  = @("server02", "server03")
 $TargetPath        = "C$\inetpub\wwwroot"
 $LogFile           = "C:\PAC_Sync\SyncLog_$(Get-Date -Format 'yyyyMMdd').log"
+$FirstRunFlag      = "C:\PAC_Sync\first_run.flag"
 
 # ====================== INITIAL SETUP ===========================
-
-# Check if archieve folder exists on the primary iis server
 try {
     if (!(Test-Path $ArchiveFolder)) { New-Item -ItemType Directory -Path $ArchiveFolder -Force | Out-Null }
     if (!(Test-Path (Split-Path $LogFile))) { New-Item -ItemType Directory -Path (Split-Path $LogFile) -Force | Out-Null }
@@ -25,8 +24,11 @@ function Write-Log {
     Write-Host $logEntry
 }
 
+$IsFirstRun = -not (Test-Path $FirstRunFlag)
+
 # ====================== PROCESS PAC FILES ===========================
 $FilesToSync = @()
+$NewArchives = @{}
 
 foreach ($PACFile in $PACFiles) {
     $SourceFile = Join-Path $SourceFolder $PACFile
@@ -34,40 +36,36 @@ foreach ($PACFile in $PACFiles) {
     $ArchiveFileName = "$($PACFile -replace '\.pac$', "_$(Get-Date -Format 'yyyyMMdd_HHmmss').pac")"
     $ArchiveFilePath = Join-Path $ArchiveFolder $ArchiveFileName
 
-    try { # Check if PAC file exist
+    try {
         if (!(Test-Path -Path $SourceFile)) {
             Write-Log "WARNING: PAC file not found: $SourceFile" "WARN"
             continue
         }
 
-        # Retrieves the last modified timestamp of the PAC file
-        $LastModified = (Get-Item $SourceFile).LastWriteTime 
+        $LastModified = (Get-Item $SourceFile).LastWriteTime
         Write-Log "PAC file '$PACFile' found. Last modified: $LastModified"
 
-        # Searches the archive folder for the latest archived version of this PAC file.
         $LatestArchive = Get-ChildItem -Path $ArchiveFolder -Filter $ArchivePattern -ErrorAction SilentlyContinue |
                          Sort-Object LastWriteTime -Descending |
                          Select-Object -First 1
 
         $ShouldArchive = $true
-        if ($LatestArchive) {
+        if ($LatestArchive -and -not $IsFirstRun) {
             $ArchivedTime = $LatestArchive.LastWriteTime
             Write-Log "Latest archive for '$PACFile': $($LatestArchive.Name) (Archived at: $ArchivedTime)"
-
-            # If the PAC file hasn’t changed since the last archive, it skips archiving by setting $ShouldArchive to false.
             if ($LastModified -le $ArchivedTime) {
                 Write-Log "No change detected for '$PACFile'. Skipping archive."
                 $ShouldArchive = $false
             }
         } else {
-            Write-Log "No previous archive found for '$PACFile'. Proceeding to archive."
+            Write-Log "No previous archive found or first run. Proceeding to archive."
         }
 
-        # If the PAC file has changed ($ShouldArchive = true), it creates a new archive and adds the file to $FilesToSync.
         if ($ShouldArchive) {
             Copy-Item -Path $SourceFile -Destination $ArchiveFilePath -Force -ErrorAction Stop
             Write-Log "Archived '$PACFile' as $ArchiveFilePath"
             $FilesToSync += $PACFile
+            $NewArchives[$PACFile] = $ArchiveFilePath
         }
 
     } catch {
@@ -76,8 +74,8 @@ foreach ($PACFile in $PACFiles) {
 }
 
 # ====================== COPY TO SECONDARY SERVERS ===========================
-if ($FilesToSync.Count -gt 0) {
-    Write-Log "Changes detected in PAC files: $($FilesToSync -join ', '). Proceeding to sync."
+if ($FilesToSync.Count -gt 0 -or $IsFirstRun) {
+    Write-Log "Syncing PAC files to secondary servers..."
 
     foreach ($Server in $SecondaryServers) {
         try {
@@ -95,23 +93,38 @@ if ($FilesToSync.Count -gt 0) {
                 $SourceFile = Join-Path $SourceFolder $PACFile
                 $UNCPathFile = "\\$Server\$TargetPath\$PACFile"
 
+                # Copy updated PAC file
                 Copy-Item -Path $SourceFile -Destination $UNCPathFile -Force -ErrorAction Stop
                 Write-Log "Copied '$PACFile' to $UNCPathFile"
-            }
 
-            # Sync all archive files
-            $ArchiveFiles = Get-ChildItem -Path $ArchiveFolder -Filter "*.pac" -File
-            foreach ($File in $ArchiveFiles) {
-                Copy-Item -Path $File.FullName -Destination $UNCPathArchive -Force -ErrorAction Stop
-                Write-Log "Copied archive file '$($File.Name)' to $UNCPathArchive"
+                # Copy archive file
+                if ($IsFirstRun -or $NewArchives.ContainsKey($PACFile)) {
+                    $ArchiveFilesToCopy = @()
+                    if ($IsFirstRun) {
+                        $ArchiveFilesToCopy = Get-ChildItem -Path $ArchiveFolder -Filter "$($PACFile -replace '\.pac$', '_*.pac')" -File
+                    } else {
+                        $ArchiveFilesToCopy = @(Get-Item $NewArchives[$PACFile])
+                    }
+
+                    foreach ($File in $ArchiveFilesToCopy) {
+                        Copy-Item -Path $File.FullName -Destination $UNCPathArchive -Force -ErrorAction Stop
+                        Write-Log "Copied archive file '$($File.Name)' to $UNCPathArchive"
+                    }
+                }
             }
 
         } catch {
-            Write-Log "ERROR syncing to $Server: $($_.Exception.Message)" "ERROR"
+            Write-Log "ERROR copying to $Server : $($_.Exception.Message)" "ERROR"
         }
     }
+
+    # Mark first run complete
+    if ($IsFirstRun) {
+        New-Item -Path $FirstRunFlag -ItemType File -Force | Out-Null
+        Write-Log "First run completed. Flag file created."
+    }
 } else {
-    Write-Log "No PAC file changes detected. Skipping sync to secondary servers."
+    Write-Log "No PAC file changes detected. Skipping copying to secondary servers."
 }
 
 Write-Log "Script execution finished."
