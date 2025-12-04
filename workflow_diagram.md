@@ -1,3 +1,4 @@
+```mermaid
 graph TD
     A[Start Script] --> B(Define Configs & Check Directories);
     B --> C(Dynamically discover *.pac files in C:\Repository);
@@ -39,3 +40,4 @@ graph TD
     Z_Final -- Yes --> Z_Flag(Create first_run.flag);
     Z_Flag --> Z_End(Log 'Script Finished' & Exit);
     Z_Final -- No --> Z_End;
+```
