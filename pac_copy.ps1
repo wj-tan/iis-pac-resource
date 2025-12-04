@@ -1,6 +1,4 @@
 # ====================== CONFIGURATION ===========================
-# List of PAC files to monitor and synchronize
-$PACFiles          = @("Singapore.pac", "Malaysia.pac", "Vietnam.pac")
 # Staging/repository folder where admins upload new PAC files
 $RepositoryFolder  = "C:\Repository" 
 # Local base source folder (C:\inetpub\wwwroot) - this is the LIVE location
@@ -35,6 +33,18 @@ function Write-Log {
     Write-Host $logEntry
 }
 
+# ----------------- DYNAMIC PAC FILE DISCOVERY --------------------
+# List of PAC files to monitor and synchronize. This is now dynamically generated
+# by checking all .pac files in the repository folder.
+$PACFiles = @(Get-ChildItem -Path $RepositoryFolder -Filter "*.pac" -File | Select-Object -ExpandProperty Name)
+
+if ($PACFiles.Count -eq 0) {
+    Write-Log "ERROR: No PAC files found in the repository folder: $RepositoryFolder. Exiting script." "ERROR"
+    exit 1
+}
+Write-Log "Discovered PAC files to process: $($PACFiles -join ', ')"
+# -----------------------------------------------------------------
+
 # Determine if this is the initial run (used to force sync all files and archives)
 $IsFirstRun = -not (Test-Path $FirstRunFlag)
 
@@ -43,6 +53,7 @@ $FilesToSync = @() # List of PAC filenames that need syncing (i.e., they were mo
 $NewArchives = @{} # Map of PAC filename to the path of the newly created archive file
 
 foreach ($PACFile in $PACFiles) {
+    # The CountryName is derived from the PAC file name, enabling dynamic folder creation
     $CountryName = $PACFile -replace '\.pac$',''
     
     # --- File Paths ---
@@ -65,7 +76,7 @@ foreach ($PACFile in $PACFiles) {
             continue
         }
         
-        # 2. Ensure the nested local archive directory exists
+        # 2. Ensure the nested local archive directory exists (e.g., C:\Archive\AsiaSAE\Indonesia)
         if (!(Test-Path $PACArchiveDir)) { 
             New-Item -ItemType Directory -Path $PACArchiveDir -Force | Out-Null
             Write-Log "Created new local archive directory: $PACArchiveDir"
@@ -94,6 +105,7 @@ foreach ($PACFile in $PACFiles) {
 
         if ($ShouldArchiveAndDeploy) {
             # Step A: DEPLOY TO PRIMARY LIVE FOLDER
+            # This logic creates the new country's live folder (e.g., C:\inetpub\wwwroot\AsiaSAE\Indonesia)
             if (!(Test-Path $LiveDir)) {
                 New-Item -ItemType Directory -Path $LiveDir -Force | Out-Null
                 Write-Log "Created new primary live directory: $LiveDir"
@@ -133,9 +145,9 @@ if ($FilesToSync.Count -gt 0 -or $IsFirstRun) {
                 # Local nested source path (the deployed LIVE file on primary server)
                 $SourceFileToCopy = Join-Path $SourceFolder "AsiaSAE\$CountryName\$PACFile"
                 
-                # Remote target directory for the LIVE PAC file (e.g., \\server02\C$\inetpub\wwwroot\AsiaSAE\Singapore)
+                # Remote target directory for the LIVE PAC file (e.g., \\server02\C$\inetpub\wwwroot\AsiaSAE\Indonesia)
                 $RemoteLiveDir = "\\$Server\$TargetPath\AsiaSAE\$CountryName"
-                # Remote target path for the LIVE PAC file (e.g., \\server02\C$\inetpub\wwwroot\AsiaSAE\Singapore\Singapore.pac)
+                # Remote target path for the LIVE PAC file 
                 $UNCPathFile = Join-Path $RemoteLiveDir $PACFile
 
                 # Remote target path for the ARCHIVE files (nested structure)
