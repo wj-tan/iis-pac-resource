@@ -30,7 +30,7 @@ graph TD;
     T --> U(Ensure Remote Live Dir Exists);
     U --> V(Ensure Remote Archive Dir Exists);
     V --> W[Copy LIVE PAC File to Remote Live Dir];
-    W --> X[Copy NEW Archive File(s) to Remote Archive Dir];
+    W --> X[Copy NEW Archive File to Remote Archive Dir];
     X --> Y{End FilesToSync Loop?};
     
     S --> Z;
