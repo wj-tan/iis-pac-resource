@@ -1,5 +1,5 @@
 ```mermaid
-graph TD
+graph TD;
     A[Start Script] --> B(Define Configs & Check Directories);
     B --> C(Dynamically discover *.pac files in C:\Repository);
     C --> D{Any PAC files found?};
