@@ -6,6 +6,7 @@ $SecondaryServers  = @("server02", "server03")
 $TargetPath        = "C$\inetpub\wwwroot"
 $LogFile           = "C:\Scripts\SyncLog_$(Get-Date -Format 'yyyyMMdd').log"
 $FirstRunFlag      = "C:\Scripts\first_run.flag"
+$MaxCharDiffThreshold = 20
 
 # ====================== FUNCTIONS ===========================
 function Write-Log {
@@ -71,16 +72,39 @@ foreach ($FileObject in $PACFileObjects) {
         #    }
         #}
 
+        #$ShouldArchiveAndDeploy = $true
+        #if ($LatestArchive -and -not $IsFirstRun) {
+        #    $RepoHash    = (Get-FileHash -Path $RepoFile    -Algorithm SHA256).Hash
+        #    $ArchiveHash = (Get-FileHash -Path $LatestArchive.FullName -Algorithm SHA256).Hash
+        #
+        #    if ($RepoHash -eq $ArchiveHash) {
+        #        Write-Log "No change detected for '$PACFile' (hash match). Skipping."
+        #        $ShouldArchiveAndDeploy = $false
+        #    } else {
+        #        Write-Log "Change detected for '$PACFile' (hash mismatch). Proceeding with deploy." "INFO"
+        #    }
+        #}
+
         $ShouldArchiveAndDeploy = $true
         if ($LatestArchive -and -not $IsFirstRun) {
-            $RepoHash    = (Get-FileHash -Path $RepoFile    -Algorithm SHA256).Hash
+            $RepoHash    = (Get-FileHash -Path $RepoFile -Algorithm SHA256).Hash
             $ArchiveHash = (Get-FileHash -Path $LatestArchive.FullName -Algorithm SHA256).Hash
 
             if ($RepoHash -eq $ArchiveHash) {
                 Write-Log "No change detected for '$PACFile' (hash match). Skipping."
                 $ShouldArchiveAndDeploy = $false
             } else {
-                Write-Log "Change detected for '$PACFile' (hash mismatch). Proceeding with deploy." "INFO"
+                # Hash mismatch — measure extent of content change by character count difference
+                $RepoCharCount    = (Get-Content -Path $RepoFile -Raw).Length
+                $ArchiveCharCount = (Get-Content -Path $LatestArchive.FullName -Raw).Length
+                $CharDiff         = [math]::Abs($RepoCharCount - $ArchiveCharCount)
+
+                if ($CharDiff -gt $MaxCharDiffThreshold) {
+                    Write-Log "WARNING: '$PACFile' has a character count difference of $CharDiff which exceeds the $MaxCharDiffThreshold character threshold. Deploy aborted for this file." "WARN"
+                    $ShouldArchiveAndDeploy = $false
+                } else {
+                    Write-Log "Change detected for '$PACFile' (character difference: $CharDiff). Proceeding with deploy." "INFO"
+                }
             }
         }
 
