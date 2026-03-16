@@ -1,12 +1,13 @@
 # ====================== CONFIGURATION ===========================
-$RepositoryFolder  = "C:\Repository" 
-$SourceFolder      = "C:\inetpub\wwwroot"
-$ArchiveFolder     = "C:\Archive"
-$SecondaryServers  = @("server02", "server03")
-$TargetPath        = "C$\inetpub\wwwroot"
-$LogFile           = "C:\Scripts\SyncLog_$(Get-Date -Format 'yyyyMMdd').log"
-$FirstRunFlag      = "C:\Scripts\first_run.flag"
-$MaxCharDiffThreshold = 20
+$RepositoryFolder = "D:\Repository" 
+$SourceFolder = "D:\inetpub\wwwroot"
+$ArchiveFolder = "D:\Archive"
+$SecondaryServers = @("server01", "server02")
+$SMBWebRootShare = "wwwroot"
+$SMBArchiveShare = "Archive"
+$LogFile = "D:\Scripts\SyncLog_$(Get-Date -Format 'yyyyMMdd').log"
+$FirstRunFlag = "D:\Scripts\first_run.flag"
+$MinFileSizeBytes = 5120  # 5KB minimum file size threshold
 
 # ====================== FUNCTIONS ===========================
 function Write-Log {
@@ -22,7 +23,8 @@ try {
     if (!(Test-Path $ArchiveFolder)) { New-Item -ItemType Directory -Path $ArchiveFolder -Force | Out-Null }
     if (!(Test-Path $RepositoryFolder)) { New-Item -ItemType Directory -Path $RepositoryFolder -Force | Out-Null }
     if (!(Test-Path (Split-Path $LogFile))) { New-Item -ItemType Directory -Path (Split-Path $LogFile) -Force | Out-Null }
-} catch {
+}
+catch {
     Write-Log "CRITICAL: Failed to create required directories. Error: $($_.Exception.Message)" "CRIT"
     exit 1
 }
@@ -42,11 +44,11 @@ $NewArchives = @{}
 
 foreach ($FileObject in $PACFileObjects) {
     $PACFile = $FileObject.Name
-    $RepoFile = $FileObject.FullName 
-    $RepoLastModified = $FileObject.LastWriteTime
-    $CountryName = $PACFile -replace '\.pac$',''
+    $RepoFile = $FileObject.FullName
+    $RepoFileSizeBytes = $FileObject.Length
+    $RepoFileSizeKB = [math]::Round($RepoFileSizeBytes / 1KB, 2)
+    $CountryName = $PACFile -replace '\.pac$', ''
     
-    # --- Updated Paths (Removed AsiaSAE) ---
     $LiveFile = Join-Path $SourceFolder "$CountryName\$PACFile" 
     $LiveDir = Split-Path $LiveFile
     
@@ -60,52 +62,33 @@ foreach ($FileObject in $PACFileObjects) {
             New-Item -ItemType Directory -Path $PACArchiveDir -Force | Out-Null
         }
 
+        # ====================== FILE SIZE CHECK ======================
+        if ($RepoFileSizeBytes -le $MinFileSizeBytes) {
+            Write-Log "WARNING: '$PACFile' has a file size of ${RepoFileSizeKB}KB which is at or below the minimum threshold of 5KB. Deploy blocked." "WARN"
+            continue
+        }
+
         $LatestArchive = Get-ChildItem -Path $PACArchiveDir -Filter $ArchivePattern -ErrorAction SilentlyContinue |
-                            Sort-Object LastWriteTime -Descending |
-                            Select-Object -First 1
-
-        #$ShouldArchiveAndDeploy = $true
-        #if ($LatestArchive -and -not $IsFirstRun) {
-        #    if ($RepoLastModified -le $LatestArchive.LastWriteTime) {
-        #        Write-Log "No change detected for '$PACFile'. Skipping."
-        #        $ShouldArchiveAndDeploy = $false
-        #    }
-        #}
-
-        #$ShouldArchiveAndDeploy = $true
-        #if ($LatestArchive -and -not $IsFirstRun) {
-        #    $RepoHash    = (Get-FileHash -Path $RepoFile    -Algorithm SHA256).Hash
-        #    $ArchiveHash = (Get-FileHash -Path $LatestArchive.FullName -Algorithm SHA256).Hash
-        #
-        #    if ($RepoHash -eq $ArchiveHash) {
-        #        Write-Log "No change detected for '$PACFile' (hash match). Skipping."
-        #        $ShouldArchiveAndDeploy = $false
-        #    } else {
-        #        Write-Log "Change detected for '$PACFile' (hash mismatch). Proceeding with deploy." "INFO"
-        #    }
-        #}
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
 
         $ShouldArchiveAndDeploy = $true
+        $IsNewFile = (-not $LatestArchive -and -not $IsFirstRun)
+
         if ($LatestArchive -and -not $IsFirstRun) {
-            $RepoHash    = (Get-FileHash -Path $RepoFile -Algorithm SHA256).Hash
+            $RepoHash = (Get-FileHash -Path $RepoFile -Algorithm SHA256).Hash
             $ArchiveHash = (Get-FileHash -Path $LatestArchive.FullName -Algorithm SHA256).Hash
 
             if ($RepoHash -eq $ArchiveHash) {
                 Write-Log "No change detected for '$PACFile' (hash match). Skipping."
                 $ShouldArchiveAndDeploy = $false
-            } else {
-                # Hash mismatch — measure extent of content change by character count difference
-                $RepoCharCount    = (Get-Content -Path $RepoFile -Raw).Length
-                $ArchiveCharCount = (Get-Content -Path $LatestArchive.FullName -Raw).Length
-                $CharDiff         = [math]::Abs($RepoCharCount - $ArchiveCharCount)
-
-                if ($CharDiff -gt $MaxCharDiffThreshold) {
-                    Write-Log "WARNING: '$PACFile' has a character count difference of $CharDiff which exceeds the $MaxCharDiffThreshold character threshold. Deploy aborted for this file." "WARN"
-                    $ShouldArchiveAndDeploy = $false
-                } else {
-                    Write-Log "Change detected for '$PACFile' (character difference: $CharDiff). Proceeding with deploy." "INFO"
-                }
             }
+            else {
+                Write-Log "Change detected for '$PACFile' (file size: ${RepoFileSizeKB}KB). Proceeding with deploy." "INFO"
+            }
+        }
+        elseif ($IsNewFile) {
+            Write-Log "New file '$PACFile' detected with no archive copy (file size: ${RepoFileSizeKB}KB). Proceeding with deploy." "INFO"
         }
 
         if ($ShouldArchiveAndDeploy) {
@@ -120,8 +103,17 @@ foreach ($FileObject in $PACFileObjects) {
             
             $FilesToSync += $PACFile
             $NewArchives[$PACFile] = $ArchiveFilePath
+
+            if ($IsNewFile) {
+                Write-Log "New file '$PACFile' successfully deployed and archived (file size: ${RepoFileSizeKB}KB)." "INFO"
+            }
+            else {
+                Write-Log "File '$PACFile' updated and deployed successfully (file size: ${RepoFileSizeKB}KB)." "INFO"
+            }
         }
-    } catch {
+
+    }
+    catch {
         Write-Log "ERROR processing '$PACFile': $($_.Exception.Message)" "ERROR"
     }
 }
@@ -130,18 +122,17 @@ foreach ($FileObject in $PACFileObjects) {
 if ($FilesToSync.Count -gt 0 -or $IsFirstRun) {
     foreach ($Server in $SecondaryServers) {
         try {
-            if (-not (Test-Connection -ComputerName $Server -Count 1 -Quiet)) {
+            if (-not (Test-NetConnection -ComputerName $Server -port 445 -InformationLevel Quiet -WarningAction SilentlyContinue)) {
                 throw "Server $Server is not reachable."
             }
 
             foreach ($PACFile in $FilesToSync) {
-                $CountryName = $PACFile -replace '\.pac$',''
-                
-                # --- Updated Remote Paths (Removed AsiaSAE) ---
+                $CountryName = $PACFile -replace '\.pac$', ''
+
+                $RemoteLiveDir = "\\$Server\$SMBWebRootShare\$CountryName"
+                $UNCPathFile = Join-Path $RemoteLiveDir $PACFile
+                $RemoteArchiveDir = "\\$Server\$SMBArchiveShare\$CountryName"
                 $SourceFileToCopy = Join-Path $SourceFolder "$CountryName\$PACFile"
-                $RemoteLiveDir    = "\\$Server\$TargetPath\$CountryName"
-                $UNCPathFile      = Join-Path $RemoteLiveDir $PACFile
-                $RemoteArchiveDir = "\\$Server\C$\Archive\$CountryName"
 
                 if (!(Test-Path $RemoteLiveDir)) {
                     New-Item -ItemType Directory -Path $RemoteLiveDir -Force | Out-Null
@@ -151,19 +142,25 @@ if ($FilesToSync.Count -gt 0 -or $IsFirstRun) {
                 }
 
                 Copy-Item -Path $SourceFileToCopy -Destination $UNCPathFile -Force -ErrorAction Stop
-                
-                # Copy Archive Files
+                Write-Log "Successfully copied '$PACFile' to $Server web root." "INFO"
+
                 $ArchiveFilesToCopy = if ($IsFirstRun) {
                     Get-ChildItem -Path (Join-Path $ArchiveFolder $CountryName) -Filter "$($PACFile -replace '\.pac$', '_*.pac')" -File
-                } else {
+                }
+                else {
                     @(Get-Item $NewArchives[$PACFile])
                 }
 
                 foreach ($File in $ArchiveFilesToCopy) {
                     Copy-Item -Path $File.FullName -Destination $RemoteArchiveDir -Force -ErrorAction Stop
                 }
+                Write-Log "Successfully copied '$PACFile' archive to $Server." "INFO"
             }
-        } catch {
+
+            Write-Log "Successfully synced all files to $Server." "INFO"
+
+        }
+        catch {
             Write-Log "ERROR copying to $Server : $($_.Exception.Message)" "ERROR"
         }
     }
